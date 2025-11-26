@@ -1,9 +1,9 @@
 export const cities = {
-  'Vassouras': { x: 200, y: 200, isWarehouse: true },
-  'Maricá': { x: 500, y: 100 },
-  'Volta Redonda': { x: 100, y: 350 },
-  'Três Rios': { x: 350, y: 300 },
-  'Paty do Alferes': { x: 250, y: 400 }
+  'Vassouras': { x: 300, y: 250, isWarehouse: true },
+  'Maricá': { x: 650, y: 120 },
+  'Volta Redonda': { x: 150, y: 500 },
+  'Três Rios': { x: 500, y: 380 },
+  'Paty do Alferes': { x: 350, y: 520 }
 };
 
 export const roads = [

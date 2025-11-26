@@ -2,44 +2,84 @@ import React, { useMemo } from 'react';
 import { Network } from 'lucide-react';
 import { cities, roads } from './Data';
 
-const GraphView = ({ failedRoads, calculations, onRoadClick }) => {
+const GraphView = ({ failedRoads, calculations, onRoadClick, selectedRoute }) => {
   
   const activeRoads = roads.filter(r => !failedRoads.includes(r.id));
 
   const shortestPathEdges = useMemo(() => {
-    // (Lógica do useMemo para destacar caminhos - sem mudança)
     const pathSet = new Set();
     if (!calculations) {
       return pathSet;
     }
-    Object.values(calculations).forEach(result => {
-      if (result.shortest && result.shortest.path) {
-        result.shortest.path.forEach(segment => {
-          const citiesOnly = segment.substring(0, segment.indexOf('(')).trim();
-          pathSet.add(citiesOnly); 
-        });
+    
+    // Se temos uma rota selecionada, destaca apenas o caminho para o destino selecionado
+    if (selectedRoute && selectedRoute.destino) {
+      const destino = selectedRoute.destino;
+      if (calculations[destino] && calculations[destino].shortest && calculations[destino].shortest.path) {
+        const path = calculations[destino].shortest.path;
+        // Cria pares de cidades (origem -> destino)
+        for (let i = 0; i < path.length - 1; i++) {
+          const from = path[i];
+          const to = path[i + 1];
+          pathSet.add(`${from} → ${to}`);
+          pathSet.add(`${to} → ${from}`); // Grafo é não-direcionado
+        }
       }
-    });
+    } else {
+      // Destaca todos os caminhos mais curtos
+      Object.values(calculations).forEach(result => {
+        if (result.shortest && result.shortest.path) {
+          const path = result.shortest.path;
+          for (let i = 0; i < path.length - 1; i++) {
+            const from = path[i];
+            const to = path[i + 1];
+            pathSet.add(`${from} → ${to}`);
+            pathSet.add(`${to} → ${from}`);
+          }
+        }
+      });
+    }
+    
     return pathSet;
-  }, [calculations]);
+  }, [calculations, selectedRoute]);
 
   return (
-    <div className="bg-white rounded-lg p-6 shadow-lg">
-      <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <Network className="text-blue-600" />
-        Rede de Distribuição - Região de Vassouras/RJ
-      </h3>
+    <div className="bg-white rounded-lg p-8 shadow-lg">
+      <div className="mb-6">
+        <h3 className="text-2xl font-bold flex items-center gap-2">
+          <Network className="text-blue-600" />
+          Rede de Distribuição - Região de Vassouras/RJ
+        </h3>
+        {selectedRoute && (
+          <p className="text-sm text-gray-600 mt-2">
+            📍 Rota: <strong>{selectedRoute.origem}</strong> → <strong>{selectedRoute.destino}</strong>
+          </p>
+        )}
+      </div>
+
+      {/* Label de Recálculo */}
+      {failedRoads.length > 0 && (
+        <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded">
+          <p className="text-red-800 font-semibold text-sm">
+            🚨 {failedRoads.length} rota(s) falhada(s) - Sistema recalculando melhor caminho alternativo
+          </p>
+        </div>
+      )}
       
-      <svg width="600" height="500" className="border-2 border-gray-200 rounded">
+      <div className="flex justify-center mb-6">
+        <svg width="800" height="650" className="border-2 border-gray-200 rounded bg-gray-50">
         {/* 1. Desenhar estradas ativas (Clicáveis) */}
         {activeRoads.map(road => {
-          // (Lógica das estradas ativas - sem mudança)
           const start = cities[road.from];
           const end = cities[road.to];
           const midX = (start.x + end.x) / 2;
           const midY = (start.y + end.y) / 2;
-          const pathKey = `${road.from} → ${road.to}`;
-          const isShortestPath = shortestPathEdges.has(pathKey);
+          
+          // Verifica ambas as direções pois o grafo é não-direcionado
+          const pathKey1 = `${road.from} → ${road.to}`;
+          const pathKey2 = `${road.to} → ${road.from}`;
+          const isShortestPath = shortestPathEdges.has(pathKey1) || shortestPathEdges.has(pathKey2);
+          
           const lineColor = isShortestPath ? "#10b981" : "#3b82f6";
           const strokeWidth = isShortestPath ? "5" : "3";
 
@@ -67,7 +107,6 @@ const GraphView = ({ failedRoads, calculations, onRoadClick }) => {
         {failedRoads.length > 0 && roads
           .filter(r => failedRoads.includes(r.id))
           .map(road => {
-            // (Lógica das estradas falhas - sem mudança)
             const start = cities[road.from];
             const end = cities[road.to];
             const midX = (start.x + end.x) / 2;
@@ -96,13 +135,11 @@ const GraphView = ({ failedRoads, calculations, onRoadClick }) => {
             );
         })}
 
-        {/* 3. 💡 LÓGICA ATUALIZADA: Desenhar cidades (Vértices) */}
+        {/* 3. Desenhar cidades (Vértices) */}
         {Object.entries(cities).map(([name, pos]) => {
           
           // Verifica se a cidade está inacessível
           let isAccessible = true;
-          // O 'calculations' pode ser nulo na primeira renderização
-          // E verificamos se 'shortest' é nulo para aquele destino
           if (calculations && calculations[name] && calculations[name].shortest === null) {
             isAccessible = false;
           }
@@ -123,16 +160,14 @@ const GraphView = ({ failedRoads, calculations, onRoadClick }) => {
                 cx={pos.x}
                 cy={pos.y}
                 r="30"
-                fill={circleFill} // Cor dinâmica
+                fill={circleFill}
                 stroke="white"
                 strokeWidth="3"
               />
               
-              {/* Renderiza o ícone de Armazém OU o ícone de Atenção */}
               {pos.isWarehouse ? (
                 <text x={pos.x} y={pos.y - 5} textAnchor="middle" fontSize="20">🏭</text>
               ) : !isAccessible ? (
-                 // Adiciona o ícone de atenção se não for acessível
                  <text x={pos.x} y={pos.y + 8} textAnchor="middle" fontSize="25">⚠️</text>
               ) : null}
 
@@ -150,8 +185,22 @@ const GraphView = ({ failedRoads, calculations, onRoadClick }) => {
           );
         })}
       </svg>
+      </div>
 
-      {/* Legenda (Atualizada para incluir a cidade inacessível) */}
+      {/* Informações do Caminho Selecionado */}
+      {selectedRoute && calculations && calculations[selectedRoute.destino] && calculations[selectedRoute.destino].shortest && (
+        <div className="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+          <h4 className="font-bold text-blue-900 mb-2">✓ Melhor Rota Encontrada</h4>
+          <p className="text-blue-800 text-sm mb-3">
+            <strong>Caminho:</strong> {calculations[selectedRoute.destino].shortest.path.join(' → ')}
+          </p>
+          <p className="text-blue-800 text-sm font-bold">
+            <strong>Distância Total:</strong> {calculations[selectedRoute.destino].shortest.cost} km
+          </p>
+        </div>
+      )}
+
+      {/* Legenda */}
       <div className="mt-4 flex flex-wrap gap-6 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-green-500"></div>
